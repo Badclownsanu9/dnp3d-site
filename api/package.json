@@ -1,9 +1,0 @@
-{
-  "name": "dnp3d-site",
-  "private": true,
-  "type": "module",
-  "dependencies": {
-    "@vercel/blob": "latest",
-    "formidable": "latest"
-  }
-}
