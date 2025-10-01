@@ -4233,55 +4233,74 @@ section + section {
     rail.addEventListener('pointermove',e=>{ if(!isDown) return; rail.scrollLeft = sc - (e.clientX-startX); });
     rail.addEventListener('pointerup',()=>{ isDown=false; });
     </script>
-    <script>
-      (function () {
-        const form = document.getElementById('projectForm');
-        if (!form) return;
-      
-        // Your WhatsApp number (no + or spaces)
-        const WA_NUMBER = '94771509562';
-      
-        form.addEventListener('submit', function (e) {
-          e.preventDefault();
-      
-          // Read current fields (no need to add IDs)
-          const name    = (form.querySelector('input[type="text"]')   || {}).value || '';
-          const email   = (form.querySelector('input[type="email"]')  || {}).value || '';
-          const phone   = (form.querySelector('input[type="tel"]')    || {}).value || '';
-          const details = (form.querySelector('textarea')             || {}).value || '';
-          const fileEl  =  form.querySelector('input[type="file"]');
-          const file    = fileEl && fileEl.files && fileEl.files[0];
-      
-          // Compose a neat WhatsApp message
-          let msg =
-      `*New DNP 3D Inquiry*
-      *Name:* ${name}
-      *Email:* ${email}
-      *Phone:* ${phone}
-      
-      *Project Details:*
-      ${details || '-'}`;
-      
-          // WhatsApp can't receive file uploads via wa.me links,
-          // but we can include the filename so you know they attached one.
-          if (file) {
-            const sizeKB = Math.round(file.size / 1024);
-            msg += `
-      
-      (Attachment selected: ${file.name} • ${sizeKB} KB)`;
-          }
-      
-          const url = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
-      
-          // Open chat (mobile: same tab, desktop: new tab)
-          if (/Mobi|Android/i.test(navigator.userAgent)) {
-            window.location.href = url;
-          } else {
-            window.open(url, '_blank', 'noopener');
-          }
-        });
-      })();
-      </script>
+<script>
+(() => {
+  const form = document.getElementById('projectForm');
+  if (!form) return;
+
+  // Your WhatsApp number (digits only, no "+" or spaces)
+  const WA_NUMBER = '94771509562';
+  const UPLOAD_ENDPOINT = '/api/upload';
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    // Read fields (no IDs needed)
+    const name    = (form.querySelector('input[type="text"]')   || {}).value || '';
+    const email   = (form.querySelector('input[type="email"]')  || {}).value || '';
+    const phone   = (form.querySelector('input[type="tel"]')    || {}).value || '';
+    const details = (form.querySelector('textarea')             || {}).value || '';
+    const fileEl  =  form.querySelector('input[type="file"]');
+    const file    = fileEl && fileEl.files && fileEl.files[0];
+
+    let msg =
+`*New DNP 3D Inquiry*
+*Name:* ${name}
+*Email:* ${email}
+*Phone:* ${phone}
+
+*Project Details:*
+${details || '-'}`;
+
+    // If a file is selected, upload it and append the public link
+    if (file) {
+      try {
+        const fd = new FormData();
+        fd.append('file', file);
+
+        const r = await fetch(UPLOAD_ENDPOINT, { method: 'POST', body: fd });
+        const data = await r.json();
+
+        const uploadedUrl = data?.url || (Array.isArray(data?.urls) ? data.urls[0] : null);
+
+        if (r.ok && uploadedUrl) {
+          msg += `
+
+Attachment: ${uploadedUrl}`;
+        } else {
+          // Fallback: show filename/size if upload failed
+          msg += `
+
+(Attachment selected: ${file.name} • ${Math.round(file.size/1024)} KB)`;
+        }
+      } catch {
+        msg += `
+
+(Attachment selected: ${file.name} • ${Math.round(file.size/1024)} KB)`;
+      }
+    }
+
+    // Open WhatsApp chat with the composed message
+    const waUrl = 'https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(msg);
+    if (/Mobi|Android/i.test(navigator.userAgent)) {
+      window.location.href = waUrl;
+    } else {
+      window.open(waUrl, '_blank', 'noopener');
+    }
+  });
+})();
+</script>
+
       <script>
         /* Reveal on scroll */
         (() => {
@@ -4410,4 +4429,5 @@ section + section {
 </body>
 
 </html>
+
 
