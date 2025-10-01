@@ -1569,86 +1569,93 @@ body.no-scroll{ overflow: hidden; }
     el.addEventListener('mouseleave', ()=> el.removeAttribute('style'));
   });
 </script>
-  <script>
-// ====== CONFIG ======
-const OWNER_WA = "94771509562"; // <- your WhatsApp number (no +, no leading 0)
-const ACCEPTED = [".stl", ".step", ".stp", ".obj"]; // allowed file types
+<script>
+// ===== CONFIG =====
+const OWNER_WA = "94771509562"; // your WhatsApp number (no +, no leading 0)
+const ACCEPTED = [".stl", ".step", ".stp", ".obj"];
+const UPLOAD_ENDPOINT = "/api/upload";
 
-// ====== DO NOT EDIT BELOW (unless you know) ======
+// ===== INTERNAL =====
 const cta = document.getElementById("uploadCTA-neo");
 
-// hidden file input (created by JS so HTML stays unchanged)
 const hiddenFile = document.createElement("input");
 hiddenFile.type = "file";
 hiddenFile.accept = ACCEPTED.join(",");
 hiddenFile.style.display = "none";
 document.body.appendChild(hiddenFile);
 
-// simple helpers
 const extOk = (name) => ACCEPTED.some(e => name.toLowerCase().endsWith(e));
+const setLoading = (on) => {
+  if (!cta) return;
+  if (on) {
+    cta.dataset.old = cta.innerHTML;
+    cta.style.pointerEvents = "none";
+    cta.style.opacity = "0.7";
+    cta.innerHTML = '<span class="txt"><span class="ttl">Uploading…</span><span class="sub">Please wait</span></span>';
+  } else {
+    cta.innerHTML = cta.dataset.old || cta.innerHTML;
+    cta.style.pointerEvents = "";
+    cta.style.opacity = "";
+  }
+};
 
-async function uploadToServer(file, name, phone) {
+async function upload(file, name, phone) {
   const fd = new FormData();
   fd.append("file", file);
   fd.append("name", name || "");
   fd.append("customerPhone", phone || "");
-  const res = await fetch("/api/upload", { method: "POST", body: fd });
-  if (!res.ok) throw new Error("Upload failed");
-  return res.json(); // -> { url, name, customerPhone }
+
+  const res = await fetch(UPLOAD_ENDPOINT, { method: "POST", body: fd });
+  const text = await res.text();
+  let data;
+  try { data = JSON.parse(text); } catch { /* leave as text */ }
+
+  if (!res.ok) {
+    throw new Error(`HTTP ${res.status} ${res.statusText} — ${text}`);
+  }
+  return data;
 }
 
-function openWhatsApp(url, name, phone) {
-  const msg =
-`New 3D quote request
+function openWA(url, name, phone) {
+  const msg = `New 3D quote request
 Name: ${name || "N/A"}
 Phone: ${phone || "N/A"}
 File: ${url}`;
-  const wa = `https://wa.me/${OWNER_WA}?text=${encodeURIComponent(msg)}`;
-  window.open(wa, "_blank");
+  window.open(`https://wa.me/${OWNER_WA}?text=${encodeURIComponent(msg)}`, "_blank");
 }
 
-// click -> pick file
 cta?.addEventListener("click", (e) => {
   e.preventDefault();
   hiddenFile.click();
 });
 
-// after pick -> prompt details -> upload -> open WA
 hiddenFile.addEventListener("change", async () => {
   const file = hiddenFile.files?.[0];
   if (!file) return;
 
   if (!extOk(file.name)) {
-    alert(`Please upload: ${ACCEPTED.join(", ")}`);
+    alert(`Please upload one of: ${ACCEPTED.join(", ")}`);
     hiddenFile.value = "";
     return;
   }
 
-  // Collect minimal details without changing HTML
-  const name = prompt("Your name (for the quote):", "");
-  const phone = prompt("Your phone/WhatsApp number:", "");
+  const name = prompt("Your name (for the quote):", "") || "";
+  const phone = prompt("Your phone/WhatsApp number:", "") || "";
 
-  // show lightweight loading state
-  const originalHTML = cta.innerHTML;
-  cta.style.pointerEvents = "none";
-  cta.style.opacity = "0.7";
-  cta.innerHTML = '<span class="txt"><span class="ttl">Uploading…</span><span class="sub">Please wait</span></span>';
-
+  setLoading(true);
   try {
-    const { url } = await uploadToServer(file, name, phone);
-    openWhatsApp(url, name, phone);
+    const { url } = await upload(file, name, phone);
+    openWA(url, name, phone);
   } catch (err) {
     console.error(err);
-    alert("Sorry, upload failed. Please try again.");
+    alert("Sorry, upload failed. Details:\n" + err.message);
   } finally {
-    // restore UI
-    cta.innerHTML = originalHTML;
-    cta.style.pointerEvents = "";
-    cta.style.opacity = "";
+    setLoading(false);
     hiddenFile.value = "";
   }
 });
 </script>
+
 
 <script>
     /* ---- category chip scroll ---- */
