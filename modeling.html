@@ -2269,8 +2269,101 @@ body.no-scroll{ overflow: hidden; }
     });
   })();
   </script>
-  
+    <script>
+// ================= CONFIG =================
+const OWNER_WA = "94771509562";             // <-- your WhatsApp number (no +, no spaces, no leading 0)
+const ACCEPTED = [".stl", ".step", ".stp", ".obj"];
+const UPLOAD_ENDPOINT = "/api/upload";      // serverless endpoint we created
+
+// ================ HELPERS =================
+const pill = document.getElementById("uploadCTA-neo");
+const hiddenFile = document.createElement("input");
+hiddenFile.type = "file";
+hiddenFile.accept = ACCEPTED.join(",");
+hiddenFile.style.display = "none";
+document.body.appendChild(hiddenFile);
+
+const extOk = name => ACCEPTED.some(e => name.toLowerCase().endsWith(e));
+const setLoading = (on) => {
+  if (!pill) return;
+  if (on) {
+    pill.dataset.old = pill.innerHTML;
+    pill.style.pointerEvents = "none";
+    pill.style.opacity = "0.7";
+    pill.innerHTML = '<span class="txt"><span class="ttl">Uploading…</span><span class="sub">Please wait</span></span>';
+  } else {
+    pill.innerHTML = pill.dataset.old || pill.innerHTML;
+    pill.style.pointerEvents = "";
+    pill.style.opacity = "";
+  }
+};
+
+async function upload(file, name, phone) {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("name", name || "");
+  fd.append("customerPhone", phone || "");
+  const res = await fetch(UPLOAD_ENDPOINT, { method: "POST", body: fd });
+  const txt = await res.text();
+  let data = {};
+  try { data = JSON.parse(txt); } catch (_) {}
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${res.statusText} — ${txt}`);
+  if (!data?.url) throw new Error("Server OK but no URL returned.");
+  return data;
+}
+
+function goToWhatsApp(url, name, phone) {
+  const msg = `New 3D quote request
+Name: ${name || "N/A"}
+Phone: ${phone || "N/A"}
+File: ${url}`;
+  const enc = encodeURIComponent(msg);
+
+  // Use same-tab navigation to avoid popup blockers
+  const wa1 = `https://wa.me/${OWNER_WA}?text=${enc}`;
+  const wa2 = `https://api.whatsapp.com/send?phone=${OWNER_WA}&text=${enc}`; // fallback
+
+  window.location.href = wa1;
+  // Fallback after a second if nothing happened
+  setTimeout(() => {
+    if (document.visibilityState === "visible") window.location.href = wa2;
+  }, 1200);
+}
+
+// ================ WIRES ===================
+pill?.addEventListener("click", (e) => {
+  e.preventDefault();
+  hiddenFile.click();
+});
+
+hiddenFile.addEventListener("change", async () => {
+  const file = hiddenFile.files?.[0];
+  if (!file) return;
+
+  if (!extOk(file.name)) {
+    alert(`Please upload one of: ${ACCEPTED.join(", ")}`);
+    hiddenFile.value = "";
+    return;
+  }
+
+  const name = prompt("Your name (for the quote):", "") || "";
+  const phone = prompt("Your phone/WhatsApp number:", "") || "";
+
+  setLoading(true);
+  try {
+    const { url } = await upload(file, name, phone);
+    goToWhatsApp(url, name, phone);
+  } catch (err) {
+    console.error("UPLOAD_OR_WA_ERROR:", err);
+    alert("Sorry, upload failed. Details:\n" + err.message);
+  } finally {
+    setLoading(false);
+    hiddenFile.value = "";
+  }
+});
+</script>
 </body>
 </html>
+
 
 
