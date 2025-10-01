@@ -1,4 +1,4 @@
-// api/upload.js
+// /api/upload.js
 import { put } from "@vercel/blob";
 import formidable from "formidable";
 import fs from "fs/promises";
@@ -9,12 +9,13 @@ export default async function handler(req, res) {
   if (req.method !== "POST") return res.status(405).send("Only POST allowed");
 
   try {
+    // ---- parse multipart form ----
     const { fields, files } = await new Promise((resolve, reject) => {
       const form = formidable({
-        multiples: true,
+        multiples: false,
         keepExtensions: true,
         maxFileSize: 100 * 1024 * 1024, // 100MB
-        allowEmptyFiles: false,
+        allowEmptyFiles: false
       });
       form.parse(req, (err, flds, fls) => (err ? reject(err) : resolve({ fields: flds, files: fls })));
     });
@@ -32,19 +33,28 @@ export default async function handler(req, res) {
     const originalName = (f.originalFilename || "model").replace(/\s+/g, "_");
     const key = `quotes/${Date.now()}-${originalName}`;
 
+    // --- IMPORTANT: pass a Blob token (set this in Vercel env) ---
+    const BLOB_TOKEN = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!BLOB_TOKEN) {
+      return res.status(500).json({
+        error: "Config error",
+        details: "Missing BLOB_READ_WRITE_TOKEN env var"
+      });
+    }
+
     const { url } = await put(key, buf, {
       access: "public",
       contentType: f.mimetype || "application/octet-stream",
+      token: BLOB_TOKEN
     });
 
     return res.status(200).json({
       url,
       name: fields?.name || "",
-      customerPhone: fields?.customerPhone || "",
+      customerPhone: fields?.customerPhone || ""
     });
   } catch (e) {
     console.error("UPLOAD_ERROR:", e);
     return res.status(500).json({ error: "Upload failed", details: String(e?.message || e) });
   }
 }
-
